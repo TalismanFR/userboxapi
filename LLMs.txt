@@ -1,0 +1,524 @@
+usersbox API — LLM context (RU/EN)
+Source: https://teletype.in/@usersbox/I5Lr8veHxrq
+Exported at: 2025-10-27T14:41:57+03:00
+
+========================
+RU — Полное описание
+========================
+
+Кратко
+- usersbox API предоставляет поиск по большим данным (~20+ млрд документов).
+- Все запросы: метод GET.
+- Авторизация: заголовок Authorization (токен приложения).
+- Базовый URL: https://api.usersbox.ru/v1/{method_name}
+
+Последние обновления
+- usersbox API 1.1 (22 марта 2025)
+  - Добавлен параметр count к методу /search.
+  - Добавлен метод /database/{collection}/schema.
+- usersbox API 1.2 (26 мая 2025)
+  - Обновлены лимиты для /explain.
+
+Создание приложения и авторизация
+- Получите токен через Telegram-бота (команда /api → создать приложение): http://link.usersbox.ru
+- Все запросы выполняются методом GET.
+- Токен передаётся в заголовке Authorization.
+- Базовый домен: api.usersbox.ru/v1/{method_name}
+Пример:
+GET /v1/getMe HTTP/1.1
+Host: api.usersbox.ru
+Authorization: <YOUR_TOKEN>
+
+Структура ответа
+- status: "success" | "error"
+- data: объект/массив данных (если success)
+- error: { code, message } (если error)
+
+Методы
+1) /getMe — информация о текущем приложении
+- Использование: проверка авторизации и базовой информации о приложении.
+Пример ответа:
+{
+  "status": "success",
+  "data": {
+    "_id": "...",
+    "title": "Morales Publisher",
+    "token": "...",
+    "created_at": "Jan 10, 2024, 12:05:00 PM",
+    "is_active": true,
+    "balance": 150.5,
+    "owner": { "user_id": "...", "bot_id": "..." }
+  }
+}
+
+2) /sources — список источников данных
+- Возвращает перечень доступных {database, collection}.
+Пример ответа:
+{
+  "status": "success",
+  "data": {
+    "count": 981,
+    "items": [
+      {
+        "database": "cdek",
+        "collection": "full",
+        "size": 31919315138,
+        "count": 205663278,
+        "title": "🚚 CDEK [2022]"
+      },
+      {
+        "database": "100realt",
+        "collection": "parsing_2021",
+        "size": 5394439345,
+        "count": 4916799,
+        "title": "🏠  Парсинг «100realt.ru» [2021]"
+      }
+      // ... остальные источники
+    ]
+  }
+}
+
+3) /{database}/{collection}/search — поиск по конкретной коллекции
+- Параметры:
+  - q (string) — поисковый запрос (телефон, email, username, IP и т.д.).
+  - count (int) — количество возвращаемых элементов (25..500).
+- Возвращает первые найденные документы указанной коллекции.
+Пример ответа (найдены документы):
+{
+  "status": "success",
+  "data": {
+    "count": 4,
+    "items": [
+      {
+        "_id": 3212868,
+        "full_name": "Василий Иванов Максимович",
+        "birth_date": "30.08.1945",
+        "phone": "+79177840591",
+        "_score": 7.08725643157959
+      },
+      {
+        "_id": 4349339,
+        "full_name": "Василий Иванов Максимович",
+        "birth_date": "20.05.1968",
+        "phone": "+79065499712",
+        "_score": 7.08725643157959
+      }
+      // ...
+    ]
+  }
+}
+Пример ответа (без результатов):
+{
+  "status": "success",
+  "data": { "count": 0, "items": [] }
+}
+
+4) /search — глобальный поиск по всем источникам
+- Параметры:
+  - q (string) — поисковый запрос.
+- Возвращает по каждой базе до 25 документов (лимит на базу).
+Пример ответа (сокращённая структура):
+{
+  "status": "success",
+  "items": [
+    {
+      "source": { "database": "2berega_ru", "collection": "clients" },
+      "hits": { "hitsCount": 1, "count": 1, "items": [ /* ... */ ] }
+    },
+    {
+      "source": { "database": "yandex", "collection": "eda" },
+      "hits": { "hitsCount": 1, "count": 1, "items": [ /* ... */ ] }
+    }
+    // ...
+  ]
+}
+
+5) /{database}/{collection}/explain — оценка количества совпадений в коллекции
+- Параметры:
+  - q (string) — поисковый запрос.
+Пример ответа:
+{
+  "status": "success",
+  "data": { "count": 11458 }
+}
+
+6) /explain — оценка количества совпадений по всем источникам
+- Параметры:
+  - q (string) — поисковый запрос.
+Пример ответа:
+{
+  "status": "success",
+  "data": {
+    "count": 15,
+    "items": [
+      {
+        "source": { "database": "500px_com", "collection": "users" },
+        "hits": { "count": 1 }
+      },
+      {
+        "source": { "database": "appen_com", "collection": "users" },
+        "hits": { "count": 1 }
+      }
+      // ...
+    ]
+  }
+}
+Ответ без результатов:
+{
+  "status": "success",
+  "data": { "count": 0, "items": [] }
+}
+
+7) /{database}/{collection}/nearbySearch — поиск по георадиусу
+- Поддерживаемые коллекции (пример):
+  delivery_club/part1, delivery_club/part2, yandex/eda, avito/ads, auchan/users_2023
+- Параметры:
+  - lat (double) — широта
+  - lon (double) — долгота
+  - radius (int) — радиус поиска (метры)
+  - count (int) — 25..500
+Пример ответа:
+{
+  "status": "success",
+  "data": {
+    "hitsCount": 1000,
+    "tooManyDocs": true,
+    "count": 25,
+    "items": [
+      {
+        "user_id": 6538242,
+        "first_name": "Станислав",
+        "phone": "+79112778424",
+        "address": {
+          "city": "Санкт-Петербург",
+          "street": "Гороховая улица",
+          "house": "4",
+          "floor": "4",
+          "office": "28",
+          "doorcode": "3460#",
+          "comment": "арка 0625#",
+          "latitude": "59.936322",
+          "longitude": "30.311550"
+        },
+        "_score": 1.0
+      }
+      // ...
+    ]
+  }
+}
+
+8) /{database}/{collection}/sample — первые 15 документов коллекции
+- Для предварительного изучения структуры полей.
+Пример ответа (фрагмент):
+{
+  "status": "success",
+  "data": {
+    "count": 15,
+    "items": [
+      {
+        "_id": 492033988,
+        "user_id": 225889705,
+        "yandex_uid": "1219928845",
+        "first_name": "mrozovmail.ru",
+        "phone": "+79088468484",
+        "amount": 427,
+        "currency": "RUB",
+        "app": "eda_iphone",
+        "user_agent": "ios(5.5.0)",
+        "payment": { "service": "Apple Pay Yandex Eda" },
+        "address": {
+          "city": "Москва, поселение Щаповское",
+          "street": "коттеджный посёлок Европейская Долина",
+          "house": "1",
+          "office": "148",
+          "reliable": 1,
+          "latitude": "55.430539",
+          "longitude": "37.389167"
+        }
+      }
+      // ...
+    ]
+  }
+}
+
+9) /database/{collection}/schema — JSON Schema коллекции
+- Возвращает JSON Schema (draft-07) по первым ~5000 записям.
+Фрагмент:
+{
+  "status": "success",
+  "data": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "properties": {
+      "_id": { "type": "integer" },
+      "first_name": { "type": "string" },
+      "last_name": { "type": "string" },
+      "sex": { "type": "integer" }
+      // ...
+    }
+  }
+}
+
+10) /lang/ru — русская локализация полей
+Пример:
+{
+  "status": "success",
+  "data": {
+    "id": "ID",
+    "uid": "User ID",
+    "first_name": "Имя",
+    "last_name": "Фамилия",
+    "sex": "Пол",
+    "age": "Возраст"
+    // ...
+  }
+}
+
+Тарификация и лимиты
+- {database}/{collection}/search: 0.005 ₽ за документ.
+  - Минимальная плата: 25 документов (0.125 ₽) даже при отсутствии результатов.
+  - Максимальная плата при count=500: 2.5 ₽ (при наличии достаточных результатов).
+- /search: 2.5 ₽ фиксированно.
+- {database}/{collection}/nearbySearch: аналогично {database}/{collection}/search.
+- {database}/{collection}/explain: бесплатно, лимит 300 запросов/мин.
+- /explain: бесплатно, лимит 300 запросов/мин.
+- /{database}/{collection}/sample, /getMe, /sources: бесплатно.
+
+Типы данных
+- App:
+  - title (string), token (string), created_at (string, МСК), is_active (bool), balance (float)
+- Source:
+  - database (string), collection (string), size (int, bytes), title (string)
+- Document:
+  - ... (any) — основные поля документа
+  - _score (float) — оценка релевантности
+- Explanation:
+  - count (long) — количество найденных документов
+
+Коды ошибок (примеры)
+- code 1: Invalid access token — токен недействителен/просрочен (проверьте Authorization)
+- code 2: Missing access token — токен не передан (добавьте Authorization)
+- code 3: Rate limit exceeded. Retry after N seconds — превышен лимит запросов
+- code 4: Not enough requests — недостаточно средств на балансе приложения
+- code 100: Missing query parameter — не передан q в GET запросе
+- code 101: Missing path parameter — отсутствуют {database} или {collection}
+- code 102: Source not found — источник не найден (проверьте /sources)
+- code 1000: Unknown Error — внутренняя ошибка сервера
+Пример ошибки:
+{
+  "status": "error",
+  "error": { "code": 1, "message": "Invalid access token" }
+}
+
+FAQ
+- Как пополнить баланс приложения?
+  - Пополните баланс через /me, затем переведите в приложение через /api в Telegram-боте.
+- Почему у каждой базы разные поля?
+  - Зависит от исходного источника; единый стиль стараются соблюдать, но возможны отличия.
+- Как форматировать запросы?
+  - Телефоны — формат E.164; даты рождения — ДД.ММ.ГГГГ.
+- Будет ли regex?
+  - Планируется позже.
+- Почему в ответе два поля count и hitsCount?
+  - count — сколько элементов вернулось в ответе (items.size);
+  - hitsCount — приблизительное общее число совпадений в коллекции.
+- Какой лимит на count?
+  - 25..500; значения вне диапазона приводятся к ближайшему допустимому.
+- Можно ли выполнять POST-запросы?
+  - Нет, только GET.
+- Есть ли ограничения на количество запросов?
+  - Для /explain и /{database}/{collection}/explain — 300 запросов/мин. При превышении: "Rate limit exceeded. Retry after N seconds".
+
+Ссылки
+- Бот и создание приложения: http://link.usersbox.ru
+- Телеграм-бот (покупка запросов): https://usersbox.link/
+- Языковой стандарт телефонов: E.164 — https://ru.wikipedia.org/wiki/E.164
+
+
+========================
+EN — Full description
+========================
+
+Summary
+- usersbox API enables search across large-scale datasets (~20B+ documents).
+- All requests are GET.
+- Auth via Authorization header (app token).
+- Base URL: https://api.usersbox.ru/v1/{method_name}
+
+Latest updates
+- usersbox API 1.1 (Mar 22, 2025)
+  - Added count parameter to /search.
+  - Added /database/{collection}/schema endpoint.
+- usersbox API 1.2 (May 26, 2025)
+  - Updated limits for /explain.
+
+App setup and authorization
+- Obtain a token via Telegram bot (/api → create app): http://link.usersbox.ru
+- All endpoints use GET.
+- Provide the token in the Authorization header.
+- Base domain: api.usersbox.ru/v1/{method_name}
+Example:
+GET /v1/getMe HTTP/1.1
+Host: api.usersbox.ru
+Authorization: <YOUR_TOKEN>
+
+Response shape
+- status: "success" | "error"
+- data: payload (on success)
+- error: { code, message } (on error)
+
+Endpoints
+1) /getMe — current app info
+Use to validate token and inspect app details.
+Example:
+{
+  "status": "success",
+  "data": {
+    "_id": "...",
+    "title": "Morales Publisher",
+    "token": "...",
+    "created_at": "Jan 10, 2024, 12:05:00 PM",
+    "is_active": true,
+    "balance": 150.5,
+    "owner": { "user_id": "...", "bot_id": "..." }
+  }
+}
+
+2) /sources — available sources
+Returns available {database, collection} pairs.
+Example:
+{
+  "status": "success",
+  "data": {
+    "count": 981,
+    "items": [
+      {
+        "database": "cdek",
+        "collection": "full",
+        "size": 31919315138,
+        "count": 205663278,
+        "title": "🚚 CDEK [2022]"
+      }
+      // ...
+    ]
+  }
+}
+
+3) /{database}/{collection}/search — search within a single collection
+Params:
+- q (string) — phone, email, username, IP, etc.
+- count (int) — 25..500.
+Examples:
+- With hits:
+{
+  "status": "success",
+  "data": {
+    "count": 4,
+    "items": [ { "_id": 3212868, "_score": 7.08, /* ... */ } ]
+  }
+}
+- No hits:
+{
+  "status": "success",
+  "data": { "count": 0, "items": [] }
+}
+
+4) /search — global search across all sources
+Params: q (string)
+Returns up to 25 docs per source.
+Example (abridged):
+{
+  "status": "success",
+  "items": [
+    {
+      "source": { "database": "2berega_ru", "collection": "clients" },
+      "hits": { "hitsCount": 1, "count": 1, "items": [ /* ... */ ] }
+    }
+    // ...
+  ]
+}
+
+5) /{database}/{collection}/explain — count estimate for a specific collection
+Params: q (string)
+Example:
+{ "status": "success", "data": { "count": 11458 } }
+
+6) /explain — count estimate across all sources
+Params: q (string)
+Example:
+{
+  "status": "success",
+  "data": {
+    "count": 15,
+    "items": [ { "source": { "database": "500px_com", "collection": "users" }, "hits": { "count": 1 } } ]
+  }
+}
+
+7) /{database}/{collection}/nearbySearch — geo-radius search
+Supported collections (example): delivery_club/part1, delivery_club/part2, yandex/eda, avito/ads, auchan/users_2023
+Params: lat (double), lon (double), radius (int, meters), count (int, 25..500)
+Example (abridged):
+{
+  "status": "success",
+  "data": {
+    "hitsCount": 1000,
+    "tooManyDocs": true,
+    "count": 25,
+    "items": [ { "user_id": 6538242, "_score": 1.0, /* address ... */ } ]
+  }
+}
+
+8) /{database}/{collection}/sample — first 15 documents
+Use to review field structure.
+
+9) /database/{collection}/schema — JSON Schema (draft-07)
+Returns inferred schema from ~5000 first records.
+
+10) /lang/ru — Russian field localization
+Returns a map of technical field names to human-readable Russian labels.
+
+Pricing and limits
+- {database}/{collection}/search: 0.005 RUB per document
+  - Minimum charge: 25 docs (0.125 RUB) even if no hits
+  - Max at count=500: 2.5 RUB (if enough results)
+- /search: 2.5 RUB flat
+- {database}/{collection}/nearbySearch: same as collection search
+- {database}/{collection}/explain: free, 300 RPM limit
+- /explain: free, 300 RPM limit
+- /{database}/{collection}/sample, /getMe, /sources: free
+
+Data types
+- App: title, token, created_at (MSK), is_active, balance
+- Source: database, collection, size (bytes), title
+- Document: arbitrary fields; _score relevance
+- Explanation: count (long)
+
+Errors (examples)
+- 1 Invalid access token — check Authorization
+- 2 Missing access token — add Authorization
+- 3 Rate limit exceeded. Retry after N seconds
+- 4 Not enough requests — insufficient app balance
+- 100 Missing query parameter — missing q
+- 101 Missing path parameter — missing {database} or {collection}
+- 102 Source not found — verify via /sources
+- 1000 Unknown Error — server-side error
+Example:
+{ "status": "error", "error": { "code": 1, "message": "Invalid access token" } }
+
+FAQ
+- How to top up the app balance?
+  - Top up via /me, then transfer to the app via /api in the Telegram bot.
+- Why do sources have different fields?
+  - Origin-dependent; unified naming where possible.
+- How to format queries?
+  - Phones: E.164; birth dates: DD.MM.YYYY.
+- Regex support?
+  - Planned.
+- Why both count and hitsCount?
+  - count = items returned; hitsCount = approximate total matches in collection.
+- count limit?
+  - 25..500; out-of-range values are clamped.
+- POST allowed?
+  - No, GET only.
+- Request limits?
+  - /explain and /{database}/{collection}/explain: 300 RPM; exceeding yields "Rate limit exceeded. Retry after N seconds".
